@@ -423,15 +423,10 @@ class Converter(html_in.HtmlTags):
 
     def _create_element_for_tag(self, tag_name, children):
         """Create a moin_page DOM element for the given HTML tag name."""
-        if tag_name in self.symmetric_tags:
-            return ET.Element(ET.QName(tag_name, moin_page), attrib={}, children=children)
-        elif tag_name in self.simple_tags:
-            return ET.Element(self.simple_tags[tag_name], attrib={}, children=children)
-        elif tag_name in self.indirect_tags:
-            attrib = {moin_page("html-tag"): tag_name}
-            return ET.Element(self.indirect_tags[tag_name], attrib=attrib, children=children)
-        else:
-            return ET.Element(ET.QName(tag_name, moin_page), attrib={}, children=children)
+        tree = html_in_converter(f"<{tag_name} />")
+        element = tree[0][0]  # strip <page> and <body> wrappers
+        element.extend(children)
+        return element
 
     def _reassemble_split_html_tags(self, node):
         """
@@ -460,7 +455,7 @@ class Converter(html_in.HtmlTags):
             if isinstance(child, str):
                 m = self._open_tag_re.match(child)
                 if m:
-                    pre_text, tag_name, inner_text = m.group(1), m.group(2), m.group(3)
+                    pre_text, tag_name, inner_text = m.group(1, 2, 3)
                     tag_lower = tag_name.lower()
                     closing_tag = f"</{tag_name}>"
 
