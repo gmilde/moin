@@ -118,7 +118,7 @@ class Converter(html_in.HtmlTags):
         | (set(simple_tags.keys()) - {"br"})
         | set(html_in.HtmlTags.indirect_tags.keys())
     )
-    _open_tag_re = re.compile(r"^(.*?)<(\w+)(?:\s[^>]*)?>(.*)$", re.DOTALL)
+    _open_tag_re = re.compile(r"^(.*?)(<(\w+)(?:\s[^>]*)?>)(.*)$", re.DOTALL)
 
     def new_copy_symmetric(self, element, attrib):
         """
@@ -421,9 +421,11 @@ class Converter(html_in.HtmlTags):
                             child.tag = moin_page.div
                 self.convert_invalid_p_nodes(child)
 
-    def _create_element_for_tag(self, tag_name, children):
-        """Create a moin_page DOM element for the given HTML tag name."""
-        tree = html_in_converter(f"<{tag_name} />")
+    def _create_element_for_tag(self, tag: str, children):
+        """Create a moin_page DOM element for the given HTML tag."""
+        if not tag.endswith("/>"):
+            tag = tag.replace(">", " />")  # make tag self-closing (we append the child elements later)
+        tree = html_in_converter(tag)
         element = tree[0][0]  # strip <page> and <body> wrappers
         element.extend(children)
         return element
@@ -455,7 +457,7 @@ class Converter(html_in.HtmlTags):
             if isinstance(child, str):
                 m = self._open_tag_re.match(child)
                 if m:
-                    pre_text, tag_name, inner_text = m.group(1, 2, 3)
+                    pre_text, tag, tag_name, inner_text = m.group(1, 2, 3, 4)
                     tag_lower = tag_name.lower()
                     closing_tag = f"</{tag_name}>"
 
@@ -487,7 +489,7 @@ class Converter(html_in.HtmlTags):
                             # Recursively process inner children (handles nested split tags)
                             self._reassemble_split_html_tags(inner)
 
-                            new_elem = self._create_element_for_tag(tag_lower, inner)
+                            new_elem = self._create_element_for_tag(tag, inner)
 
                             if pre_text:
                                 result.append(pre_text)

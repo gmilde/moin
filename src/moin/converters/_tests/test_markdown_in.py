@@ -272,14 +272,17 @@ class TestConverter:
             "<del>Deleted list item with <emphasis>emphasized text</emphasis></del>"
             "</list-item-body></list-item></list>",
         ),
+        (
+            '<abbr title="for example">_e.g._</abbr>',
+            '<p><span html-tag="abbr" html:title="for example"><emphasis>e.g.</emphasis></span></p>',
+        ),
         ("<ins>Inserted with _emphasis_</ins>", "<p><ins>Inserted with <emphasis>emphasis</emphasis></ins></p>"),
         ("<kbd>Press **Q**</kbd>", "<p><kbd>Press <strong>Q</strong></kbd></p>"),
         ("<del>`1+1`</del>", "<p><del><code>1+1</code></del></p>"),
         ("<dfn>**strong** term</dfn>", '<p><emphasis html-tag="dfn"><strong>strong</strong> term</emphasis></p>'),
-        ("<tt>**mono**</tt>", "<p><literal><strong>mono</strong></literal></p>"),
         ("<i>alternate **voice**</i>", '<p><emphasis html-tag="i">alternate <strong>voice</strong></emphasis></p>'),
         ("<small>`fine` print</small>", '<p><span html-tag="small"><code>fine</code> print</span></p>'),
-        ("<abbr>_e.g._</abbr>", '<p><span html-tag="abbr"><emphasis>e.g.</emphasis></span></p>'),
+        ("<tt>**mono**</tt>", "<p><literal><strong>mono</strong></literal></p>"),
         # ignored tag and content
         ("<script>`1+1`</script>", "<div><p>\n</p></div>"),
     ]
@@ -291,6 +294,10 @@ class TestConverter:
 
     data = [  # Some valid samples still fail!
         # tags with dedicated visit_{tag_name}() method:
+        (
+            '<a href="subitem">link *text*</a>',
+            '<p><a xlink:href="wiki.local:subitem">link <emphasis>text</emphasis></a></p>',
+        ),
         ("<big>_larger_</big>", '<p><span html:class="moin-big"><emphasis>larger</emphasis></span></p>'),
         ("<acronym>**AC/DC**</acronym>", '<p><span html-tag="abbr"><strong>AC/DC</strong></span></p>'),
         # tags with standard_attributes "title", "class", "style", and "alt"
