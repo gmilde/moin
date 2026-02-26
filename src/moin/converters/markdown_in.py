@@ -111,13 +111,8 @@ class Converter(html_in.HtmlTags):
     simple_tags = html_in.Converter.simple_tags.copy()
     simple_tags["dl"] = moin_page.list_item
     simple_tags["table"] = moin_page.table
+    void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
-    # Non-void HTML tags that could be split by markdown's inline pattern processor
-    _non_void_html_tags = frozenset(
-        html_in.HtmlTags.symmetric_tags
-        | (set(simple_tags.keys()) - {"br"})
-        | set(html_in.HtmlTags.indirect_tags.keys())
-    )
     _open_tag_re = re.compile(r"^(.*?)(<(\w+)(?:\s[^>]*)?>)(.*)$", re.DOTALL)
 
     def new_copy_symmetric(self, element, attrib):
@@ -421,13 +416,18 @@ class Converter(html_in.HtmlTags):
                             child.tag = moin_page.div
                 self.convert_invalid_p_nodes(child)
 
-    def _create_element_for_tag(self, tag: str, children):
-        """Create a moin_page DOM element for the given HTML tag."""
+    def _create_element_for_tag(self, tag):
+        """Return a moin_page DOM element for the given HTML tag.
+
+        If the tag name is not supported, return None.
+        """
         if not tag.endswith("/>"):
             tag = tag.replace(">", " />")  # make tag self-closing (we append the child elements later)
         tree = html_in_converter(tag)
-        element = tree[0][0]  # strip <page> and <body> wrappers
-        element.extend(children)
+        try:
+            element = tree[0][0]  # strip <page> and <body> wrappers
+        except IndexError:
+            return None
         return element
 
     def _reassemble_split_html_tags(self, node):
@@ -458,10 +458,9 @@ class Converter(html_in.HtmlTags):
                 m = self._open_tag_re.match(child)
                 if m:
                     pre_text, tag, tag_name, inner_text = m.group(1, 2, 3, 4)
-                    tag_lower = tag_name.lower()
                     closing_tag = f"</{tag_name}>"
 
-                    if tag_lower in self._non_void_html_tags and closing_tag not in child:
+                    if tag_name.lower() not in self.void_tags and closing_tag not in child:
                         # Scan forward through siblings for the matching closing tag
                         close_idx = None
                         for j in range(i + 1, len(children)):
@@ -489,11 +488,15 @@ class Converter(html_in.HtmlTags):
                             # Recursively process inner children (handles nested split tags)
                             self._reassemble_split_html_tags(inner)
 
-                            new_elem = self._create_element_for_tag(tag, inner)
+                            new_elem = self._create_element_for_tag(tag)
 
                             if pre_text:
                                 result.append(pre_text)
-                            result.append(new_elem)
+                            if new_elem:
+                                new_elem.extend(inner)
+                                result.append(new_elem)
+                            elif tag_name not in self.ignored_tags:
+                                result.extend(inner)
                             if post_text:
                                 result.append(post_text)
 
@@ -514,8 +517,7 @@ class Converter(html_in.HtmlTags):
             else:
                 # EmeraldTree Element: replace all children
                 del node[:]
-                for c in result:
-                    node.append(c)
+                node.extend(result)
 
     def __init__(self):
         # The Moin configuration

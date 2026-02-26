@@ -273,18 +273,27 @@ class TestConverter:
             "</list-item-body></list-item></list>",
         ),
         (
+            '<a href="subitem">link *text*</a>',
+            '<p><a xlink:href="wiki.local:subitem">link <emphasis>text</emphasis></a></p>',
+        ),
+        (
             '<abbr title="for example">_e.g._</abbr>',
             '<p><span html-tag="abbr" html:title="for example"><emphasis>e.g.</emphasis></span></p>',
         ),
+        ("<acronym>**AC/DC**</acronym>", '<p><span html-tag="abbr"><strong>AC/DC</strong></span></p>'),
+        ("<BIG>_larger_</BIG>", '<p><span html:class="moin-big"><emphasis>larger</emphasis></span></p>'),
         ("<ins>Inserted with _emphasis_</ins>", "<p><ins>Inserted with <emphasis>emphasis</emphasis></ins></p>"),
         ("<kbd>Press **Q**</kbd>", "<p><kbd>Press <strong>Q</strong></kbd></p>"),
-        ("<del>`1+1`</del>", "<p><del><code>1+1</code></del></p>"),
+        ("<DEL>`1+1`</DEL>", "<p><del><code>1+1</code></del></p>"),
         ("<dfn>**strong** term</dfn>", '<p><emphasis html-tag="dfn"><strong>strong</strong> term</emphasis></p>'),
         ("<i>alternate **voice**</i>", '<p><emphasis html-tag="i">alternate <strong>voice</strong></emphasis></p>'),
         ("<small>`fine` print</small>", '<p><span html-tag="small"><code>fine</code> print</span></p>'),
         ("<tt>**mono**</tt>", "<p><literal><strong>mono</strong></literal></p>"),
-        # ignored tag and content
+        # explicitly ignored tags are dropped together with their content:
+        ("<button>`Stop`</button>", "<p />"),
         ("<script>`1+1`</script>", "<div><p>\n</p></div>"),
+        # unknown tags are ignored but their content is passed on:
+        ("<custom>`1+1`</custom>", "<p><code>1+1</code></p>"),
     ]
 
     @pytest.mark.parametrize("input,output", data)
@@ -293,24 +302,6 @@ class TestConverter:
         self.do(input, output)
 
     data = [  # Some valid samples still fail!
-        # tags with dedicated visit_{tag_name}() method:
-        (
-            '<a href="subitem">link *text*</a>',
-            '<p><a xlink:href="wiki.local:subitem">link <emphasis>text</emphasis></a></p>',
-        ),
-        ("<big>_larger_</big>", '<p><span html:class="moin-big"><emphasis>larger</emphasis></span></p>'),
-        ("<acronym>**AC/DC**</acronym>", '<p><span html-tag="abbr"><strong>AC/DC</strong></span></p>'),
-        # tags with standard_attributes "title", "class", "style", and "alt"
-        ('<del class="red">`1+1`</del>', '<p><del html:class="red"><code>1+1</code></del></p>'),
-        (
-            '<abbr title="for example">_e.g._</abbr>',
-            '<p><span html-tag="abbr" title="for example"><emphasis>e.g.</emphasis></span></p>',
-        ),
-        # explicitly ignored tags are dropped together with their content:
-        ("<button>`Stop`</button>", "<p />"),
-        # unknown tags are ignored but their content is passed on:
-        ("<custom>`1+1`</custom>", "<p><code>1+1</code></p>"),
-        # TODO: Markdown markup and empty tags: fix paragraphs <p>:
         # <br> is an inline tag: do not break the paragraph!
         ("one<br>_two_", "<div><p>one<line-break /><emphasis>two</emphasis></p></div>"),
         ("one<br />_two_", "<div><p>one<line-break /><emphasis>two</emphasis</p>></div>"),
