@@ -365,39 +365,42 @@ class Converter(html_in.HtmlTags):
                 lineno += line_count + 2
         self.line_numbers = line_numbers
 
-    def embedded_markup(self, text):
+    def html_markup(self, text):
         """
-        Allow embedded raw HTML markup per https://daringfireball.net/projects/markdown/syntax#html
-        This replaces the functionality of RawHtmlPostprocessor in .../markdown/postprocessors.py.
+        Handle embedded HTML markup.
 
-        To prevent hackers from exploiting raw HTML, the strings of safe HTML are converted to
+        The RawHtmlPostprocessor (in .../markdown/postprocessors.py)
+        places back HTML markup that was stashed away by the
+        HtmlBlockPreprocessor and the HtmlInlineProcessor.
+        This method converts the HTML markup to moin_page
         tree nodes by using the html_in.py converter.
+
+        https://daringfireball.net/projects/markdown/syntax#html
+        https://python-markdown.github.io/reference/markdown/
         """
         try:
-            # we enclose plain text and span tags with P-tags
-            p_text = html_in_converter(f"<p>{text}</p>")
-            # discard page and body tags
-            return p_text[0][0]
+            page = html_in_converter(f"<div>{text}</div>")  # wrap in auxiliary element to avoid orphan strings
+            return list(page[0][0])  # discard <page> and <body> wrappers, return <div>'s children
         except (AssertionError, IndexError) as ex:
             # malformed tags, will be escaped so user can see and fix
             logging.debug(f"Caught exception in embedded_markup: {ex}")
             return text
 
-    def convert_embedded_markup(self, node):
+    def convert_embedded_html_markup(self, node):
         """
-        Recurse through tree looking for embedded or generated markup.
+        Recurse through tree looking for embedded or generated HTML markup.
 
         :param node: a tree node
         """
-        for idx, child in enumerate(node):
+        for i, child in enumerate(node):
             if isinstance(child, str):
                 # search for HTML tags
                 if re.search("<[^ ].*?>", child):
-                    node[idx] = self.embedded_markup(child)  # child is immutable string, so must do node[idx]
+                    node[i : i + 1] = self.html_markup(child)  # replace child with result of conversion
             else:
-                # do not convert markup within a <pre> tag
-                if not child.tag == moin_page.blockcode and not child.tag == moin_page.code:
-                    self.convert_embedded_markup(child)
+                # do not convert markup within "literal" elements
+                if child.tag not in (moin_page.blockcode, moin_page.code):
+                    self.convert_embedded_html_markup(child)
 
     def convert_invalid_p_nodes(self, node):
         """
@@ -599,7 +602,7 @@ class Converter(html_in.HtmlTags):
         self._reassemble_split_html_tags(converted)
 
         # convert html embedded in text strings to EmeraldTree nodes
-        self.convert_embedded_markup(converted)
+        self.convert_embedded_html_markup(converted)
         # convert P-tags containing block elements to DIV-tags
         self.convert_invalid_p_nodes(converted)
 
