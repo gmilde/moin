@@ -222,8 +222,8 @@ class TestConverter:
 
     data = [
         # TODO: there are too many <div> wrappers!
-        ("line<br />break", "<div><p>line<line-break />break</p></div>"),
-        ("<big>larger</big>", '<div><p><span html:class="moin-big">larger</span></p></div>'),
+        ('<a href="subitem">link text</a>', '<div><p><a xlink:href="wiki.local:subitem">link text</a></p></div>'),
+        ("<BIG>larger</BIG>", '<div><p><span html:class="moin-big">larger</span></p></div>'),
         ('<span class="moin-small">smaller</span>', '<div><p><span html:class="moin-small">smaller</span></p></div>'),
         ("<sub>sub</sub>script", "<div><p><sub>sub</sub>script</p></div>"),
         ("<sup>super</sup>script", "<div><p><sup>super</sup>script</p></div>"),
@@ -251,6 +251,14 @@ class TestConverter:
         ),
         # in HTML5, <acronym> is deprecated in favour of <abbr>
         ("<acronym>AC/DC</acronym>", '<div><p><span html-tag="abbr">AC/DC</span></p></div>'),
+        # <br> is a void inline element
+        ("one<br />two", "<div><p>one<line-break />two</p></div>"),
+        ("one<br>two", "<div><p>one<line-break />two</p></div>"),
+        ("one<br />\ntwo", "<div><p>one<line-break />\ntwo</p></div>"),
+        ("one  \ntwo", "<p>one<line-break />\ntwo</p>"),
+        # there may be multiple HTML elements in a block
+        ("<u>underline</u> and <sub>sub</sub>", "<div><p><u>underline</u> and <sub>sub</sub></p></div>"),
+        ("<u>underline with <sub>sub</sub></u>", "<div><p><u>underline with <sub>sub</sub></u></p></div>"),
     ]
 
     @pytest.mark.parametrize("input,output", data)
@@ -267,6 +275,7 @@ class TestConverter:
         ("<ins>Inserted with _emphasis_</ins>", "<p><ins>Inserted with <emphasis>emphasis</emphasis></ins></p>"),
         ("<kbd>Press **Q**</kbd>", "<p><kbd>Press <strong>Q</strong></kbd></p>"),
         ("<del>`1+1`</del>", "<p><del><code>1+1</code></del></p>"),
+        ("<dfn>**strong** term</dfn>", '<p><emphasis html-tag="dfn"><strong>strong</strong> term</emphasis></p>'),
         ("<tt>**mono**</tt>", "<p><literal><strong>mono</strong></literal></p>"),
         ("<i>alternate **voice**</i>", '<p><emphasis html-tag="i">alternate <strong>voice</strong></emphasis></p>'),
         ("<small>`fine` print</small>", '<p><span html-tag="small"><code>fine</code> print</span></p>'),
@@ -283,7 +292,6 @@ class TestConverter:
     data = [  # Some valid samples still fail!
         # tags with dedicated visit_{tag_name}() method:
         ("<big>_larger_</big>", '<p><span html:class="moin-big"><emphasis>larger</emphasis></span></p>'),
-        ("<p><dfn>*strong* term</dfn></p>", '<p><emphasis html-tag="dfn"><strong>strong</strong>term</emphasis></p>'),
         ("<acronym>**AC/DC**</acronym>", '<p><span html-tag="abbr"><strong>AC/DC</strong></span></p>'),
         # tags with standard_attributes "title", "class", "style", and "alt"
         ('<del class="red">`1+1`</del>', '<p><del html:class="red"><code>1+1</code></del></p>'),
@@ -291,7 +299,7 @@ class TestConverter:
             '<abbr title="for example">_e.g._</abbr>',
             '<p><span html-tag="abbr" title="for example"><emphasis>e.g.</emphasis></span></p>',
         ),
-        # explicitly ignored tags are dropped toghether with their content:
+        # explicitly ignored tags are dropped together with their content:
         ("<button>`Stop`</button>", "<p />"),
         # unknown tags are ignored but their content is passed on:
         ("<custom>`1+1`</custom>", "<p><code>1+1</code></p>"),
@@ -302,6 +310,19 @@ class TestConverter:
         ("one<br>\n_two_", "<div><p>one<line-break /><emphasis>two</emphasis></p></div>"),
         ("_one_<br>two", "<div><p><emphasis>one</emphasis><line-break />two</p></div>"),
         ("_one_<br>\ntwo", "<div><p><emphasis>one</emphasis><line-break />\ntwo</p></div>"),
+        # there may be multiple HTML elements in a block
+        (  # paragraph starts too late
+            "<u>**underline**</u> and <sub>sub</sub>",
+            "<div><p><u><strong>underline</strong></u> and <sub>sub</sub></p></div>",
+        ),
+        (  # Error: malformed HTML: end tag mismatch
+            "<u>underline</u> and <sub>**sub**</sub>",
+            "<div><p><u>underline</u> and <sub><strong>sub</strong></sub></p></div>",
+        ),
+        (
+            "<u>**underline**</u> and <sub>**sub**</sub>",
+            "<div><p><u><strong>underline</strong></u> and <sub><strong>sub</strong></sub></p></div>",
+        ),
     ]
 
     @pytest.mark.xfail
